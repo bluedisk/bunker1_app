@@ -1,0 +1,3 @@
+# view AndroidManifest.xml #generated:6
+-keep class com.bunker1church.weekly.Bunker1Church { <init>(...); }
+
