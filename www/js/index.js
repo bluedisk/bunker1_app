@@ -107,16 +107,22 @@ function download(weekly) {
     window.requestFileSystem(LocalFileSystem.PERSISTENT, 0,
         function (fs) {
 
-
+            console.log("dir root:"+fs.root.fullPath);
             fs.root.getDirectory('downloaded', {create: true}, function(dirEntry) {
 
 
                 var fileTransfer = new FileTransfer();
+                console.log("dir entry 1:"+dirEntry.toURL());
+                console.log("dir entry 2:"+dirEntry.fullPath);
+
+
                 fileTransfer.download(uri, dirEntry.toURL() + "/" + weekly.date + '.pdf' ,
                     function(entry) { // download success
+                    
 
 
                         weekly.locallink = entry.toURL();
+                        weekly.fullpath = entry.fullPath;
                         weeklies.save();
 
 
@@ -125,6 +131,8 @@ function download(weekly) {
 
                     },
                     function(error) {
+                        navigator.notification.alert('네트워크 연결상태를 확인해주세요!',null,'네트워크 에러!','확인');
+
 console.log("error1");
 
                         stopLoading(weekly);
@@ -155,14 +163,18 @@ function initEndpoint() {
     var apisToLoad;
     var callback = function() {
         if (--apisToLoad == 0) {
+            console.log("== gapi fully inited! ==");
+
             endpointDeferred.resolve();
             requestRemote();
         }
     }
 
+    console.log('== load gapi starting...');
     apiRoot = "https://bunker1cc.appspot.com/_ah/api";
+    //apiRoot = "http://localhost:9080/_ah/api";
     apisToLoad = 1; // must match number of calls to gapi.client.load()
-    gapi.client.load('bunker1cc', 'v1', callback, apiRoot);
+    gapi.client.load('bunker1cc', 'v2', callback, apiRoot);
   
 }
 
@@ -269,10 +281,23 @@ function updateCurrentWeekly() {
 
             $('#weekly-view').show();
 
-            var ref = window.open(current_weekly.locallink, "_blank", "location=no");
-            ref.addEventListener('exit', function() {     
-                $('[data-role="navbar"] a[href="#page-weekly"]').click();
-            });
+            if ( device.platform.toLowerCase() === 'android1') {
+                console.log('locallink:'+current_weekly.locallink);
+                console.log('fullpath:'+current_weekly.fullpath);
+                window.plugins.webintent.startActivity({
+                        action: window.plugins.webintent.ACTION_VIEW,
+                        type: "application/pdf",
+                        url: encodeURI(current_weekly.locallink)
+                    },
+                    function() {console.log('success');},
+                    function() {console.log('Failed to open URL via Android Intent:'+current_weekly);}
+                );
+            } else {
+                var ref = window.open(current_weekly.locallink, "_blank", "location=no");
+                ref.addEventListener('exit', function() {     
+                    $('[data-role="navbar"] a[href="#page-weekly"]').click();
+                });
+            }
         }
     }
 
@@ -336,23 +361,35 @@ function setupMenu() {
     footer.html(menu_template({menu:menu}));
     footer.trigger('create');
 }
+  
+  function loadMapScript() {
+    var script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCYmcLNq1RNPeT5Pez6v5FitWFenhlxPqM&v=3.exp&sensor=true&' +
+    'callback=initializeMap';
+    document.body.appendChild(script);
+  }
 
-function initMap() {
-    var position = new daum.maps.LatLng(37.5781682,127.0047038);
 
-    var map = new daum.maps.Map(document.getElementById('map'), {
-        center: position,
-        level: 4,
-        mapTypeId: daum.maps.MapTypeId.HYBRID
+  function initializeMap() {
+    var church = new google.maps.LatLng(37.5781682,127.0047038);
+    
+    var mapOptions = {
+      center: church,
+      zoom: 17
+    };
+
+    var map = new google.maps.Map(document.getElementById("map"),
+      mapOptions);
+
+    var marker = new google.maps.Marker({
+      map:map,
+      draggable:true,
+      animation: google.maps.Animation.DROP,
+      position: church
     });
+  }
 
-    var marker = new daum.maps.Marker({
-        position: position
-    });
-    marker.setMap(map);
-
-    $('#map').focus();
-}
 
 function setCurrentTab(tab) {
     if ( $(tab).attr('in') ) return;
@@ -384,7 +421,10 @@ $(function() {
     });
 
     $('#page-map').on('pageshow', function(e,data) {
-        initMap();
+        if ( typeof google === 'undefined' ) 
+            loadMapScript();
+        else
+            initializeMap(); 
     });
 
     $('[data-role="page"]').on('pageshow', function(e,data) {
@@ -399,7 +439,6 @@ $(function() {
         if ( $(this).attr('id') !== "page-map" ) 
             $.mobile.back();
     })
-
 
 });
 

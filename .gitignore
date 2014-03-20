@@ -1,6 +1,7 @@
 
 .DS_Store
+*.class
+*.obj
+gen/
+bin/
 
-platforms
-
-platforms/ios/Bunker1 Church/Bunker1 Church-Info.plist
